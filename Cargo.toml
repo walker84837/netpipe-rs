@@ -1,0 +1,24 @@
+[package]
+name = "netpipe"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+categories = ["command-line-utilities"]
+keywords = ["command-line", "cli"]
+readme = "README.md"
+repository = "https://github.com/walker84837/netpipe-rs"
+
+[profile.dev]
+debug = false
+
+[profile.release]
+strip = true
+lto = true
+overflow-checks = true
+panic = "abort"
+
+[dependencies]
+anyhow = "1.0.86"
+clap = { version = "4.5.2", features = ["derive"] }
+log = "0.4.21"
+simple_logger = "5.0.0"
