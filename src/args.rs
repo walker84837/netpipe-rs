@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
@@ -7,8 +7,8 @@ pub struct Args {
     #[clap(short, long)]
     pub file: Option<PathBuf>,
 
-    #[clap(short, long, default_value = "4")]
-    pub ip_version: u8,
+    #[clap(short, long, default_value = "4", value_parser = clap::value_parser!(IpVersion))]
+    pub ip_version: IpVersion,
 
     #[clap(
         short,
@@ -16,7 +16,7 @@ pub struct Args {
         default_value = "tcp",
         help = "The protocol to use. Possible choices: TCP|UDP"
     )]
-    pub protocol: String,
+    pub protocol: Protocol,
 
     #[clap(short, long, default_value = "0", help = "Timeout in seconds")]
     pub timeout: u64,
@@ -32,4 +32,18 @@ pub struct Args {
 
     pub address: Option<String>,
     pub port: Option<u16>,
+}
+
+#[derive(ValueEnum, Clone, Debug)]
+pub enum Protocol {
+    Tcp,
+    Udp,
+}
+
+#[derive(ValueEnum, Clone, Debug)]
+pub enum IpVersion {
+    #[clap(name = "4")]
+    V4,
+    #[clap(name = "6")]
+    V6,
 }

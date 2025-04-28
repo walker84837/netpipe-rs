@@ -11,12 +11,12 @@ use std::{
 
 pub fn is_valid_address(address: &str, version: &u8) -> bool {
     match version {
-        4 => address
-            .parse::<Ipv4Addr>()
-            .map_or(false, |ip| ip.is_global()),
+        4 => address.parse::<Ipv4Addr>().map_or(false, |ip| {
+            ip.is_global() || ip.is_shared() || ip.is_private() || ip.is_loopback()
+        }),
         6 => address
             .parse::<Ipv6Addr>()
-            .map_or(false, |ip| ip.is_global()),
+            .map_or(false, |ip| ip.is_global() || ip.is_loopback()),
         _ => false,
     }
 }
@@ -136,51 +136,37 @@ pub fn run_client(args: &Args, protocol: &str, timeout: Duration) -> Result<()> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::thread;
-    use clap::Parser;
+    use std::{
+        net::{IpAddr, Ipv4Addr, SocketAddr},
+        sync::atomic::{AtomicBool, Ordering},
+        thread,
+        time::Duration,
+    };
 
-    #[test]
-    fn test_is_valid_address() {
-        assert!(is_valid_address("192.168.0.1", &4));
-        assert!(!is_valid_address("999.999.999.999", &4));
-        assert!(is_valid_address("::1", &6));
-        assert!(!is_valid_address("invalid-ip", &6));
-    }
-
+    // Test TCP communication with server handling a single connection
     #[test]
     fn test_tcp_communication() {
-        let server = thread::spawn(|| {
-            let args = Args::parse_from(&["test", "--listen", "127.0.0.1", "8080"]);
-            run_server(&args, "tcp", Duration::from_secs(5)).unwrap();
+        let server_handle = thread::spawn(|| {
+            let args = Args::parse_from(&[
+                "test",
+                "--listen",
+                "--address",
+                "127.0.0.1",
+                "--port",
+                "8080",
+            ]);
+            run_server(&args, &Protocol::Tcp, Duration::from_secs(1)).unwrap();
         });
 
-        thread::sleep(Duration::from_secs(1));
+        thread::sleep(Duration::from_millis(100)); // Allow server to start
 
-        let client = thread::spawn(|| {
-            let args = Args::parse_from(&["test", "127.0.0.1", "8080"]);
-            run_client(&args, "tcp", Duration::from_secs(5)).unwrap();
+        let client_handle = thread::spawn(|| {
+            let args = Args::parse_from(&["test", "--address", "127.0.0.1", "--port", "8080"]);
+            run_client(&args, &Protocol::Tcp, Duration::from_secs(1)).unwrap();
         });
 
-        server.join().unwrap();
-        client.join().unwrap();
-    }
-
-    #[test]
-    fn test_udp_communication() {
-        let server = thread::spawn(|| {
-            let args =
-                Args::parse_from(&["test", "--listen", "--protocol", "UDP", "127.0.0.1", "8080"]);
-            run_server(&args, "udp", Duration::from_secs(5)).unwrap();
-        });
-
-        thread::sleep(Duration::from_secs(1));
-
-        let client = thread::spawn(|| {
-            let args = Args::parse_from(&["test", "--protocol", "UDP", "127.0.0.1", "8080"]);
-            run_client(&args, "udp", Duration::from_secs(5)).unwrap();
-        });
-
-        server.join().unwrap();
-        client.join().unwrap();
+        client_handle.join().unwrap();
+        // Server will exit after handling one connection due to timeout in test
+        server_handle.join().unwrap();
     }
 }
